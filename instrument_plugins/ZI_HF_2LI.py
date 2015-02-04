@@ -1,10 +1,6 @@
-# Keithley_2700.py driver for Keithley 2700 DMM
-# Pieter de Groot <pieterdegroot@gmail.com>, 2008
-# Martijn Schaafsma <qtlab@mcschaafsma.nl>, 2008
-# Reinier Heeres <reinier@heeres.eu>, 2008
-#
-# Update december 2009:
-# Michiel Jol <jelle@michieljol.nl>
+# ZI_HF_2LI.py driver for Zurich Instruments 50 MHz HF2LI lockin amplifier
+# Harold Meerwaldt <H.B.Meerwaldt@tudelft.nl>, 2012
+# Scott Johnston <jot@mit.edu>, 2012
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,6 +33,8 @@ import qt
 #and chapter 10: Node definitions of the manual for setting and getting parameters
 
 import zhinst
+from zhinst import utils
+from zhinst import ziPython
 
 class ZI_HF_2LI(Instrument):
     '''
@@ -79,28 +77,44 @@ class ZI_HF_2LI(Instrument):
         # Add parameters to wrapper
         # you need a funtion with do_get_parameter and do_set_parameter, which
         # will generate functions get_parameter and set_parameter
+        # the channels option will generate functions set_parameter1() e.g.
+        # and needs to be called without the "protected" options self and channel
         self.add_parameter('frequency',
             flags=Instrument.FLAG_GETSET,
-            units='Hz', minval=1e-6, maxval=50e6, type=types.FloatType)
+            units='Hz', channels=(0,1), minval=1e-6, maxval=50e6, type=types.FloatType)
         self.add_parameter('timeconstant',
             flags=Instrument.FLAG_GETSET,
-            units='s', minval=1e-6, maxval=500, type=types.FloatType)
+            units='s', channels=(0,1),minval=780e-9, maxval=500, type=types.FloatType)
+        self.add_parameter('filter_order',
+            flags=Instrument.FLAG_GETSET,
+            units='s', channels=(0,1),minval=1, maxval=8, type=types.IntType)
         self.add_parameter('output_switch',
             flags=Instrument.FLAG_GETSET,
-            units='boolean', minval=0, maxval=1, type=types.IntType)
+            units='boolean', channels=(0,1),type=types.BooleanType)
         self.add_parameter('output_range',
             flags=Instrument.FLAG_GETSET,
-            units='V', minval=0.01, maxval=10, type=types.FloatType)
+            units='V', channels=(0,1), minval=0.01, maxval=10, type=types.FloatType)
+        self.add_parameter('input_range',
+            flags=Instrument.FLAG_GETSET,
+            units='V', channels=(0,1), minval=0.001, maxval=2, type=types.FloatType)
         self.add_parameter('output_channel_fraction',
             flags=Instrument.FLAG_GETSET,
-            units='V/V', minval=0, maxval=1, type=types.FloatType)
+            units='V/V', channels=(0,1), minval=0, maxval=1, type=types.FloatType)
         self.add_parameter('output_channel_enables',
             flags=Instrument.FLAG_GETSET,
-            units='boolean', minval=0, maxval=1, type=types.IntType)
+            units='boolean', channels=(0,1), minval=0, maxval=1, type=types.IntType)
         self.add_parameter('power',
             flags=Instrument.FLAG_GETSET,
-            units='V', minval=0, maxval=10, type=types.FloatType)
-
+            units='V', channels=(0,1), minval=0, maxval=10, type=types.FloatType)
+        self.add_parameter('reference',
+            flags=Instrument.FLAG_GETSET,type=types.StringType)
+        self.add_parameter('impedance50Ohm',
+            flags=Instrument.FLAG_GETSET,channels=(0,1),type=types.BooleanType)
+        self.add_parameter('external_clock',
+            flags=Instrument.FLAG_GETSET,type=types.BooleanType)
+        self.add_parameter('auxoffset', type=types.FloatType, channels=(0,1,2,3),
+            flags=Instrument.FLAG_GETSET,
+            minval=-10.5, maxval=10.5, units='V', format='%.3f')
         
         # Add functions to wrapper
 ##        self.add_function('set_mode_volt_ac')
@@ -137,63 +151,85 @@ class ZI_HF_2LI(Instrument):
 
     def get_phase(self,node=0):
         sample = self.get_sample(node)
-        return float(sample['phase'])
+        return numpy.arctan(float(sample['y'])/float(sample['x']))
+        #return float(sample['phase'])
 
     def get_amplitude(self,node=0):
         sample = self.get_sample(node)
         return numpy.sqrt(float(sample['x'])**2+float(sample['y'])**2)
 
-    def do_get_frequency(self,node=0):
-        sample = self.get_sample(node)
+    def do_get_frequency(self,channel):
+        sample = self.get_sample(channel)
         return float(sample['frequency'])
 
-    def do_set_frequency(self,value=10e6,node=0):
-        self._daq.set([[['/'+self._device+'/oscs/'+str(node)+'/freq'],value]])
+    def do_set_frequency(self,value,channel):
+        print('/'+self._device+'/oscs/'+str(channel)+'/freq')
+        self._daq.set([[['/'+self._device+'/oscs/'+str(channel)+'/freq'],value]])
 
-    def do_get_timeconstant(self,node=0):
-        return self._daq.getDouble('/'+self._device+'/demods/'+str(node)+'/timeconstant')
+    def do_get_timeconstant(self,channel):
+        return self._daq.getDouble('/'+self._device+'/demods/'+str(channel)+'/timeconstant')
 
-    def do_set_timeconstant(self,value=0.01,node=0):
-        self._daq.set([[['/'+self._device+'/demods/'+str(node)+'/timeconstant'],value]])
+    def do_set_timeconstant(self,value,channel):
+        self._daq.set([[['/'+self._device+'/demods/'+str(channel)+'/timeconstant'],value]])
 
-    def do_get_output_switch(self,node=0):
-        return self._daq.getInt('/'+self._device+'/sigouts/'+str(node)+'/on')
+    def do_get_filter_order(self,channel):
+        return self._daq.getDouble('/'+self._device+'/demods/'+str(channel)+'/order')
 
-    def do_set_output_switch(self,value,node=0):
-        self._daq.set([[['/'+self._device+'/sigouts/'+str(node)+'/on'],value]])
+    def do_set_filter_order(self,value,channel):
+        self._daq.set([[['/'+self._device+'/demods/'+str(channel)+'/order'],value]])
 
-    def do_get_output_range(self,node=0):
-        return self._daq.getDouble('/'+self._device+'/sigouts/'+str(node)+'/range')
+    def do_get_output_switch(self,channel):
+        return self._daq.getInt('/'+self._device+'/sigouts/'+str(channel)+'/on')
 
-    def do_set_output_range(self,value,node=0):
+    def do_set_output_switch(self,value,channel):
+        self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/on'],value]])
+
+    def do_get_output_range(self,channel):
+        return self._daq.getDouble('/'+self._device+'/sigouts/'+str(channel)+'/range')
+
+    def do_set_output_range(self,value,channel):
         if value not in [0.01,0.1,1,10]:
             logging.warning('Allowed values for range are 0.01, 0.1, 1, 10 V. Range is not set.')
             #I would like it to return a False but I don't know how
         else:    
-            self._daq.set([[['/'+self._device+'/sigouts/'+str(node)+'/range'],value]])
+            self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/range'],value]])
+
+    def do_get_input_range(self,channel):
+        return self._daq.getDouble('/'+self._device+'/sigins/'+str(channel)+'/range')
+
+    def do_set_input_range(self,value,channel):
+        self._daq.set([[['/'+self._device+'/sigins/'+str(channel)+'/range'],value]])
+
+    def set_input_range_auto(self,channel):
+        self._daq.set([[['/'+self._device+'/sigins/'+str(channel)+'/range']]])
+
 
 #from here, zi cannot find the nodes: use the program zicontrol and look at the bottom for the code of the nodes
 
-    def do_get_output_channel_fraction(self,node=0,channel=6):
-        return self._daq.getDouble('/'+self._device+'/sigouts/'+str(node)+'/amplitudes/'+str(channel))
+    def do_get_output_channel_fraction(self,channel):
+        return self._daq.getDouble('/'+self._device+'/sigouts/'+str(channel)+'/amplitudes/'+str(6))
 
-    def do_set_output_channel_fraction(self,value,node=0,channel=6):
-        self._daq.set([[['/'+self._device+'/sigouts/'+str(node)+'/amplitudes/'+str(channel)],value]])
+    def do_set_output_channel_fraction(self,value,channel):
+        self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/amplitudes/'+str(6)],value]])
 
-    def do_get_output_channel_enables(self,node=0,channel=6):
+    def do_get_output_channel_enables(self,channel):
         #return ('/'+self._device+'/sigouts/'+str(node)+'/enables/'+str(channel))
-        return self._daq.getInt('/'+self._device+'/sigouts/'+str(node)+'/enables/'+str(channel))
+        return self._daq.getInt('/'+self._device+'/sigouts/'+str(channel)+'/enables/'+str(6))
 
-    def do_set_output_channel_enables(self,value,node=0,channel=6):
-        self._daq.set([[['/'+self._device+'/sigouts/'+str(node)+'/enables/'+str(channel)],value]])
+    def do_set_output_channel_enables(self,value,channel):
+        self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/enables/'+str(6)],value]])
 
 
-    def do_get_power(self,node=0,channel=6):
-        fraction = self.get_output_channel_fraction(node=node,channel=channel)
-        chrange = self.get_output_range(node=node)
+    def do_get_power(self,channel):
+        fraction = self.get_output_channel_fraction(channel)
+        chrange = self.get_output_range(channel)
         return chrange*fraction
 
-    def do_set_power(self,value,node=0,channel=6,safetyrange=0.8):
+    def set_power000(self,value,chrange,channel=0):
+        
+        self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/amplitudes/'+str(6)],value/chrange]])
+
+    def do_set_power(self,value,channel,safetyrange=0.8):
         
         if value < 0.01*safetyrange:
             chrange = 0.01
@@ -205,23 +241,110 @@ class ZI_HF_2LI(Instrument):
             chrange = 10
 
         fraction = value/chrange
-        self.set_output_range(chrange, node=node)
-        self._daq.set([[['/'+self._device+'/sigouts/'+str(node)+'/amplitudes/'+str(channel)],value/chrange]])
+        if chrange not in [0.01,0.1,1,10]:
+            logging.warning('Allowed values for range are 0.01, 0.1, 1, 10 V. Range is not set.')
+            print 'error wrong range'
+            #I would like it to return a False but I don't know how
+        else:    
+            self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/range'],chrange]])
+        
+        self._daq.set([[['/'+self._device+'/sigouts/'+str(channel)+'/amplitudes/'+str(6)],value/chrange]])
+
+
+    def do_get_reference(self):
+        enable = self._daq.getInt('/'+self._device+'/plls/0/enable')
+        adcselect = self._daq.getInt('/'+self._device+'/plls/0/adcselect')
+        if enable == 0:
+            string = 'Internal'
+        elif enable ==1:
+            if adcselect == 0:
+                string = 'Signal Input 1'
+            elif adcselect == 1:
+                string = 'Signal Input 2'
+
+        return string
+
+    def do_set_reference(self,value):
+        if value == 'Internal':
+            self._daq.set([[['/'+self._device+'/plls/0/enable'],0]])
+        elif value == 'Signal Input 1':
+            self._daq.set([[['/'+self._device+'/plls/0/adcselect'],0]])
+            self._daq.set([[['/'+self._device+'/plls/0/enable'],1]])
+        elif value == 'Signal Input 2':
+            self._daq.set([[['/'+self._device+'/plls/0/adcselect'],1]])
+            self._daq.set([[['/'+self._device+'/plls/0/enable'],1]])
+        else:
+            print "Allowed values are: 'Internal', 'Signal Input 1', 'Signal Input 2'"
+
+  
+    def do_get_impedance50Ohm(self,channel):
+        return self._daq.getInt('/'+self._device+'/sigins/'+str(channel)+'/imp50')
+
+    def do_set_impedance50Ohm(self,value,channel):
+        self._daq.set([[['/'+self._device+'/sigins/'+str(channel)+'/imp50'],value]])
+
+    def do_get_external_clock(self):
+        return self._daq.getInt('/'+self._device+'/system/extclk')
+
+    def do_set_external_clock(self,value):
+        self._daq.set([[['/'+self._device+'/system/extclk'],value]])
+        
+
+    def set_auxmode(self,channel,value):
+        '''
+        example:
+                    .set_auxmode(3,-1)
+                    ->set aux3 to manual mode
+        
+        #select channel and integer value (see list below)
+        Signal to be given out.
+        Write Integer Number
+        Read Integer Number
+        Setting Yes
+        Values -1 Manual
+        /DEV0...n/AUXOUTS/0...n/DEMODSELECT
+        HF2 User Manual Revision 7921 Zurich Instruments 232
+        0 X
+        1 Y
+        2 R
+        3 Theta
+        4 PLL 0 (with installed PLL option))
+        4 PLL 1 (with installed PLL option))
+        #if channel = 1 aux 1 is selected not 0 anymore when using (channel -1)
+        '''
+        self._daq.set([[['/'+self._device+'/AUXOUTS/'+str(channel)+'/OUTPUTSELECT'],value]])
+    def do_set_auxoffset(self, value, channel):
+        '''
+        example:
+                    .set_auxmode(4,-5)
+                    ->set aux4 offset to -5V
+
+        set an offset value on the aux
+        channel = aux
+        value is in Volts
+        '''
+        self._daq.set([[['/'+self._device+'/AUXOUTS/'+str(channel)+'/OFFSET'],value]])
+
+    def do_get_auxoffset(self,channel):
+        #self._daq.get([[['/'+self._device+'/AUXOUTS/'+str(channel)+'/OFFSET'],value]])
+        return self._daq.getInt('/'+self._device+'/auxouts/'+str(channel)+'/OFFSET/')
+
+    def set_auxscale(self,channel,value):
+        self._daq.set([[['/'+self._device+'/AUXOUTS/'+str(channel)+'/SCALE'],value]])
 
 
     def get_daq(self):
         return self._daq
 
-
-       
     def write(self,string,value):
-        self._daq.set([[[string],value]])
+        self._daq.set([[['/'+self._device+'/'+string],value]])
+        #eg: string='oscs/0/freq' value=3000
 
     def query(self,string):
         try:
-            return self._daq.getDouble(string)
+            return self._daq.getDouble('/'+self._device+'/'+string)
         except:
-            return self._daq.getInt(string)
+            return self._daq.getInt('/'+self._device+'/'+string)
 # --------------------------------------
 #           parameters
 # --------------------------------------

@@ -169,6 +169,8 @@ class Keithley_2700(Instrument):
 
         self.add_function('send_trigger')
         self.add_function('fetch')
+        self.add_function('trigfetch')
+        
 
         # Connect to measurement flow to detect start and stop of measurement
         qt.flow.connect('measurement-start', self._measurement_start_cb)
@@ -223,6 +225,37 @@ class Keithley_2700(Instrument):
         self.set_range(10)
         self.set_nplc(1)
         self.set_averaging(False)
+    def set_ben_settings(self, nplc = 1, v_range = 1):
+        '''
+        Runs a set of commands to optimize Keithley speed and brings the system into trigger mode.
+        .write('*RST')
+        .set_nplc(1) #sets measuremnt time to n powerline cycle by keithley  1 = 20ms
+        .set_display(0)                               #turn display off
+        .write('SENSe:FUNCtion "VOLTage:DC"')   #set to Voltage mode
+        .write(':FORM:ELEM READ') #just getting the values nothing else.. :)
+        .write('INITiate:CONTinuous OFF;:ABORt')      #vm.set_trigger_continuous(False)
+        .write('SYSTem:AZERo:STATe OFF')               #Turn autozero off for speed (will result in voltage offsets over time!!)
+        .write('SENSe:VOLTage:DC:AVERage:STATe OFF')  #Turn off filter for speed
+        .write('SENSe:VOLTage:DC:RANGe 1')          #give it a fixed range to max speed
+        .write('TRIG:DEL:AUTO OFF')                   #set triger delay to manual
+        .write('TRIG:DEL 0')                          #TRIGger:DELay to 0 sec
+        .write('TRIGger:COUNt 1')
+        .get_all()
+        '''
+        self.write('*RST')
+        self.set_nplc(nplc) #sets measuremnt time to n powerline cycle by keithley  1 = 20ms
+        self.set_display(0)                               #turn display off
+        self.write('SENSe:FUNCtion "VOLTage:DC"')
+        self.write(':FORM:ELEM READ') #just getting the values nothing else.. :)
+        self.write('INITiate:CONTinuous OFF;:ABORt')      #vm.set_trigger_continuous(False)
+        self.write('SYSTem:AZERo:STATe OFF')               #Turn autozero off for speed (will result in voltage offsets over time!!)
+        self.write('SENSe:VOLTage:DC:AVERage:STATe OFF')  #Turn off filter for speed
+        self.write('SENSe:VOLTage:DC:RANGe '+str(v_range))          #give it a fixed range to max speed
+        self.write('TRIG:DEL:AUTO OFF')                   #set triger delay to manual
+        self.write('TRIG:DEL 0')                          #TRIGger:DELay to 0 sec
+        self.write('TRIGger:COUNt 1')
+        self.get_all()
+
 
     def get_all(self):
         '''
@@ -315,6 +348,20 @@ class Keithley_2700(Instrument):
             logging.warning('No trigger sent, use send_trigger')
         else:
             logging.error('Triggering is on continous!')
+
+    def trigfetch(self):
+        '''
+        Sends 1 triger cycle command
+        and 1 fetch
+        '''
+        self._visainstrument.write('INIT')
+        reply = numpy.array(eval(self._visainstrument.ask('Fetch?'))) #value can also be an array of results
+        return reply
+
+    def query(self,something):
+        return self._visainstrument.ask(something)
+    def write(self,something):
+        self._visainstrument.write(something)
 
     def set_mode_volt_ac(self):
         '''

@@ -134,7 +134,7 @@ class RS_FSV(Instrument):
         self.get_source_power()
         self.get_trace_continuous()
 
-    def get_trace(self):
+    def get_trace2(self):
         '''
         Takes a new, single trace then returns it as a list of amplitudes.
         For requency/amplitude pairs see spectrum_measure.fsl_measure()
@@ -143,6 +143,20 @@ class RS_FSV(Instrument):
         #self._visainstrument.write('INIT;*WAI') #Start new trace and wait for completion
         logging.debug('Reading trace')
         return eval('[' + self._visainstrument.ask('TRAC? TRACE1') + ']') #read out trace
+
+    def get_trace(self):
+        a = 0
+        while a==0:
+            qt.msleep(0.01)
+            try:
+                a=eval(self.query('*OPC?;'))
+                break
+            except(KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                a=0
+        trace= eval('[' + self._visainstrument.ask('TRAC? TRACE1') + ']')
+        return trace
 
     def store_trace(self):
         '''

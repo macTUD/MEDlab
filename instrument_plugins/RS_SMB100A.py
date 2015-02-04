@@ -88,7 +88,7 @@ class RS_SMB100A(Instrument):
         #Measurement parameters
         self.add_parameter('RF_frequency',
                             flags=Instrument.FLAG_GETSET,
-                            units='MHz', minval=0.009, maxval=12750,
+                            units='MHz', minval=0.009, maxval=12700,
                             type=types.FloatType)
         self.add_parameter('RF_power',
                             flags=Instrument.FLAG_GETSET,

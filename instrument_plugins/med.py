@@ -26,6 +26,12 @@ class med(Instrument):
         self.add_parameter('measurement_time', type=types.StringType,
                 flags=Instrument.FLAG_GETSET,Units='h:m:s')
 
+        self.add_parameter('sweep_time', type=types.StringType,
+                flags=Instrument.FLAG_GETSET,Units='h:m:s')
+
+        self.add_parameter('frame_time', type=types.StringType,
+                flags=Instrument.FLAG_GETSET,Units='h:m:s')
+
         self.add_function('get_all')
 
         if reset:
@@ -82,3 +88,15 @@ class med(Instrument):
 
     def do_set_measurement_time(self, val):
         self._measurement_time = val
+
+    def do_set_frame_time(self,val):
+        self._frame_time =val
+
+    def do_set_sweep_time(self,val):
+        self._sweep_time =val
+
+    def do_get_frame_time(self):
+        return self._frame_time
+
+    def do_get_sweep_time(self):
+        return self._sweep_time

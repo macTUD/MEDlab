@@ -396,6 +396,34 @@ class Keithley_2100(Instrument):
         text = self._visainstrument.ask('READ?')
         return float(text[0:15])
 
+    def a(self,ask):
+        answer = self._visainstrument.ask(ask)
+        return answer
+
+    def w(self,write):
+        self._visainstrument.write(write)
+
+    def ben_settings(self,nplc=1,v_range=1):
+        self.w('*CLS') #clear error bit flag
+        self.w('*RST') #reset system
+        self.w('SENSe:FUNCtion "VOLTage:DC"')
+        #self.w(':FORM:ELEM READ')                          #just getting the values nothing else.. :)
+        #self.w('SYSTem:AZERo:STATe OFF')                   #Turn autozero off for speed (will result in voltage offsets over time)
+        self.w('SENSe:AVERage:STATe OFF')                   #Turn off filter for speed
+        self.w('SENSe:VOLTage:DC:RANGe '+str(v_range))      #give it a fixed range to max speed
+        self.w('SENSe:VOLTage:DC:NPLCycles ' +str(nplc))    #nplc of 1 is 20ms integration time
+        self.w('TRIG:DEL:AUTO OFF')                         #set triger delay to manual
+        self.w('TRIG:DEL 0')                                #set TRIGger:DELay to 0 sec
+        self.w('TRIGger:COUNt 1')
+        self.w('TRIGger:SOURce IMMediate')                  #send one trigger
+        
+    def bens_speedup(self):
+        ''' the folowing commands work better with the keithley 2700'''
+        self.w('DISP 0')                            #turn display off
+        self.w(':FORM:ELEM READ')                   #just getting the values nothing else.. :)
+        self.w('SYSTem:AZERo:STATe OFF')            #Turn autozero off for speed (will result in voltage offsets over time)
+        self.w('INITiate:CONTinuous OFF;:ABORt')    #vm.set_trigger_continuous(False)
+
     def do_set_range(self, val, mode=None):
         '''
         Set range to the specified value for the

@@ -37,7 +37,7 @@ def bool_to_str(val):
     else:
         return "OFF"
 
-class Keithley_2000(Instrument):
+class Keithley_2100(Instrument):
     '''
     This is the driver for the Keithley 2100 Multimeter
 

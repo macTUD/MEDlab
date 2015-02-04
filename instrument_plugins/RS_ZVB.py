@@ -1,3 +1,7 @@
+# RS_ZVB.py driver for Rohde & Schwarz ZVB vector network analyzer
+# Harold Meerwaldt <H.B.Meerwaldt@tudelft.nl>, 2012
+# Scott Johnston <jot@mit.edu>, 2012
+
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -31,7 +35,7 @@ def bool_to_str(val):
 
 class RS_ZVB(Instrument):
     '''
-    This is the driver for the Rohde & Schwarz FSL spectrum analyzer
+    This is the driver for the Rohde & Schwarz ZVB vector network analyzer
 
     Usage:
     Initialize with
@@ -45,7 +49,7 @@ class RS_ZVB(Instrument):
     
     def __init__(self, name, address, reset=False):
         '''
-        Initializes a R&S FSL, and communicates with the wrapper.
+        Initializes a R&S ZVB, and communicates with the wrapper.
 
         Input:
             name (string)           : name of the instrument
@@ -53,7 +57,7 @@ class RS_ZVB(Instrument):
             reset (bool)            : resets to default values
         '''
         # Initialize wrapper functions
-        logging.info('Initializing instrument Rohde & Schwarz FSL spectrum analyzer')
+        logging.info('Initializing instrument Rohde & Schwarz ZVB vector network analyzer')
         Instrument.__init__(self, name, tags=['physical'])
 
         # Add some global constants
@@ -86,7 +90,13 @@ class RS_ZVB(Instrument):
         self.add_parameter('trace_continuous', type=types.BooleanType,
                           flags=Instrument.FLAG_GETSET,
                           units='')
-
+        self.add_parameter('RF_state', type=types.BooleanType,
+                          flags=Instrument.FLAG_GETSET,
+                          units='')
+        self.add_parameter('sweep_type', type=types.StringType,
+                          flags=Instrument.FLAG_GETSET,
+                          units='')
+        
         # Connect to measurement flow to detect start and stop of measurement
         qt.flow.connect('measurement-start', self._measurement_start_cb)
         qt.flow.connect('measurement-end', self._measurement_end_cb)
@@ -105,20 +115,38 @@ class RS_ZVB(Instrument):
     def reset(self):
         return self._visainstrument.write('*RST') #reset to default settings
 
-    def get_trace2(self):
-        self._visainstrument.write('INIT;*WAI')
-        self._visainstrument.write('CALC:DATA? FDAT')
-        qt.msleep(5)
-        return eval('[' + self._visainstrument.ask('CALC:DATA? FDAT') + ']')
+    #def get_all(self):
 
     def get_trace(self):
         self._visainstrument.write('INIT;*WAI')
-        return eval('[' + self._visainstrument.ask('CALC:DATA? FDAT') + ']')
+ #       a = 0
+ #       while a == 0:
+ #           try:
+ #               a = eval(self._visainstrument.ask('*OPC?'))
+ #               break
+ #           except (KeyboardInterrupt, SystemExit):
+ #               raise
+ #           except:
+ #               a = 0
+ #       qt.msleep(0.003)
+        trace = '['+ self._visainstrument.ask('CALC:DATA? FDAT') + ']'
+        return eval(trace)
+        #return eval('[' + self._visainstrument.ask('CALC:DATA? FDAT') + ']')
 
     def grab_trace(self):
-        #self._visainstrument.write('INIT;*WAI')
-        return eval('[' + self._visainstrument.ask('CALC:DATA? FDAT') + ']')
-
+        a = 0
+        while a == 0:
+            try:
+                a = eval(self._visainstrument.ask('*OPC?'))
+                break
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                a = 0
+        qt.msleep(0.003)
+        trace = '['+ self._visainstrument.ask('CALC:DATA? FDAT') + ']'
+        return eval(trace)
+    
     def do_get_start_frequency(self): #in MHz
         '''
         Start of sweep (MHz)
@@ -147,6 +175,13 @@ class RS_ZVB(Instrument):
         logging.debug('Reading number of averages')
         return int(self._visainstrument.ask('AVER:COUN?'))
 
+    def do_get_aver_number(self):
+        '''
+        Number of currengt averages .
+        '''
+        logging.debug('Reading number of current averages')
+        return int(self._visainstrument.ask('AVER:COUN:CURR?'))
+
     def do_get_resolution_bandwidth(self): #in MHz
         logging.debug('Reading resolution bandwidth')
         return float(self._visainstrument.ask('BAND?'))/1e6
@@ -155,8 +190,8 @@ class RS_ZVB(Instrument):
         logging.debug('reading sweeptime')
         return float(self._visainstrument.ask('SWE:TIME?'))
 
-    def do_get_tracking(self):
-        logging.debug('Reading whether tracking mode is ON')
+    def do_get_RF_state(self):
+        logging.debug('Reading whether RF output is ON')
         reply = self._visainstrument.ask('OUTP?')
         return bool(int(reply))
 
@@ -195,13 +230,13 @@ class RS_ZVB(Instrument):
         logging.debug('Setting sweeptime to %s' % sweeptime)
         return self._visainstrument.write('SWE:TIME %ss' % sweeptime)
 
-    def do_set_tracking(self, tracking):
+    def do_set_RF_state(self, RF_state):
         '''
         Takes boolean (True or False)
         '''
-        logging.debug('Setting tracking to %s' % tracking)
-        tracking = bool_to_str(tracking)
-        return self._visainstrument.write('OUTP %s' % tracking)
+        logging.debug('Setting tracking to %s' % RF_state)
+        RF_state = bool_to_str(RF_state)
+        return self._visainstrument.write('OUTP %s' % RF_state)
 
     def do_set_source_power(self, source_power): #in dBm
         '''
@@ -214,8 +249,8 @@ class RS_ZVB(Instrument):
         Details such as power offset can also be adjusted at instrument (op manual p. 294)
         '''
         logging.debug('Setting tracking generator power to %s' % source_power)
-    #    if self.get_tracking()==False:
-     #       print 'Source off since not in tracking mode. Will be at %sdBm.' % source_power
+        if self.get_RF_state()==False:
+            print 'Source off since not in tracking mode. Will be at %sdBm.' % source_power
         return self._visainstrument.write('SOUR:POW %sdBm' % source_power)
     
     def do_get_trace_continuous(self):
@@ -227,8 +262,17 @@ class RS_ZVB(Instrument):
         state=bool_to_str(state)
         return self._visainstrument.write('INIT:CONT %s' % state)
 
+    def do_get_sweep_type(self):
+        logging.debug('Getting sweep type')
+        return self._visainstrument.ask('SWE:TYPE?')
 
-    
+    def do_set_sweep_type(self, val):
+        logging.debug('Setting sweep type to %s' % val)
+        return self._visainstrument.write('SWE:TYPE %s' % val)
+
+    def do_set_power_switch(self, val):
+        logging.debug('OUTP %s' % val)
+        return self._visainstrument.write('OUTP %s' % val)
         
     def write(self,string):
         self._visainstrument.write(string)

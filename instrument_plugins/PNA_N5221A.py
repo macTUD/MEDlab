@@ -108,6 +108,12 @@ class PNA_N5221A(Instrument):
         self.add_parameter('power', type=types.IntType,
                            flags=Instrument.FLAG_GETSET,
                            units='dBm',minval=-30, maxval=30)
+        self.add_parameter('dac1', type=types.FloatType,
+                           flags=Instrument.FLAG_GETSET,
+                           units='V',minval=-10.0, maxval=10.0)
+        self.add_parameter('dac2', type=types.FloatType,
+                           flags=Instrument.FLAG_GETSET,
+                           units='V',minval=-10.0, maxval=10.0)
 
         self.add_parameter('measurement_type', type=types.StringType, flags=Instrument.FLAG_GETSET, units='')
         self.add_parameter('measurement_format', type=types.StringType, flags=Instrument.FLAG_GETSET, units='')
@@ -131,7 +137,8 @@ class PNA_N5221A(Instrument):
 #           functions
 # --------------------------------------
 
-    def setup(self,measurement_type='S21', measurement_format = 'MLOG', start_frequency=1.5e9,stop_frequency=8.5e9, sweeppoints=2000,bandwidth=1e6,level=-10):
+    def setup(self,measurement_type='S21', measurement_format = 'MLOG', start_frequency=1.5e9,
+              stop_frequency=8.5e9, sweeppoints=2000,bandwidth=1e6,level=-10,continuous=False):
         '''
         Standard function to call everytime to setup a measurement.
         for the measurement type one can select S11,S12,S21, S22, A, B, A/R1,2 ,
@@ -156,6 +163,11 @@ class PNA_N5221A(Instrument):
         
         self.set_measurement_format(measurement_format)
         self._window_count =self._window_count+1
+
+        if(continuous==False):
+            self._visainstrument.write("INITiate:CONTinuous OFF")
+        if(continuous==True):
+            self._visainstrument.write("INITiate:CONTinuous ON")
         
     def sweep(self, continuous=False):
         '''
@@ -231,6 +243,18 @@ class PNA_N5221A(Instrument):
         '''Reads the data from Channel 1 (default) and its first tracce,
         assumes ASCII, if IQ is False it returns R,\phi
         '''
+        a=0
+        while a==0:
+            qt.msleep(0.05)
+            try:
+                a=eval(self.q('*OPC?;'))
+                break
+            except(KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                a=0
+
+        
         #now select correct channel and tracename
         #print "CALC" + str(channel) + ":PAR:SEL " + trace_name
         self._visainstrument.write("CALC" + str(channel) + ":PAR:SEL '" + self._get_trace_name(channel,trace_number) +"'")
@@ -286,6 +310,8 @@ class PNA_N5221A(Instrument):
         #self._visainstrument.write("CALC1:FORM DBM")
         if(auto_scale_Y==True):
             self._visainstrument.write("DISP:WIND1:TRAC1:Y:SCAL:AUTO")
+    def auto_scale(self):
+        self._visainstrument.write("DISP:WIND1:TRAC1:Y:SCAL:AUTO")
 
     def setup_2tone_spectroscopy(self, cw_freq=3e9, start_freq=1e9, stop_freq=10e9, sweep_time=10):
         '''Function to setup the PNA to do a twotone qubit spectroscopy experiment, where the
@@ -598,6 +624,20 @@ class PNA_N5221A(Instrument):
     def do_set_sweeptime(self,sweeptime):
         '''Sets the sweeptime, not very useful inless measuring in CW-mode'''
         return self._visainstrument.write("SENS1:SWE:TIME " + str(sweeptime))
+
+
+    def do_set_dac1(self,number):
+        self._visainstrument.write('CONT:AUX:OUTP1:VOLT %s' % (number))
+
+    def do_set_dac2(self,number):
+        self._visainstrument.write('CONT:AUX:OUTP2:VOLT %s' % (number))
+
+    def do_get_dac1(self):
+        return eval(self._visainstrument.ask('CONT:AUX:OUTP1:VOLT?'))
+
+    def do_get_dac2(self):
+        return eval(self._visainstrument.ask('CONT:AUX:OUTP2:VOLT?'))
+
 
 ##    def set_sweeptime_auto(self,auto=True):
 ##        print "SENS1:SWE:TIME:AUTO " + auto

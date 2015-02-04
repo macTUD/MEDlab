@@ -1,3 +1,7 @@
+# RS_FSL.py driver for Rohde & Schwarz FSL spectrum analyzer
+# Harold Meerwaldt <H.B.Meerwaldt@tudelft.nl>, 2012
+# Scott Johnston <jot@mit.edu>, 2012
+
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -36,7 +40,8 @@ class RS_FSL(Instrument):
     Usage:
     Initialize with
     <name> = qt.instruments.create('<name>', 'RS_FSL',
-        address='TCPIP::<IP-address>::INSTR')
+        address='TCPIP::<IP-address>::INSTR',
+        reset=<bool>,)
 
     For GPIB the address is: 'GPIB::<gpib-address>'
     '''
@@ -58,10 +63,7 @@ class RS_FSL(Instrument):
         # Add some global constants
         self._address = address
         self._visainstrument = visa.instrument(self._address)
-        
-        #if you want to reset timeout this could work, apparently it doesn't
-        #self._visainstrument = visa.instrument(self._address, timeout=None)
-        
+        self._visainstrument.timeout=1.0
 
         # Add parameters to wrapper
 
@@ -89,6 +91,12 @@ class RS_FSL(Instrument):
         self.add_parameter('sweeptime', type=types.FloatType,
                            flags=Instrument.FLAG_GETSET,
                            units='s')
+        self.add_parameter('number_of_sweeps', type=types.IntType,
+                           flags=Instrument.FLAG_GETSET,
+                           units='')
+        self.add_parameter('current_sweep_number', type=types.IntType,
+                           flags=Instrument.FLAG_GET,
+                           units='')
         self.add_parameter('tracking', type=types.BooleanType,
                           flags=Instrument.FLAG_GETSET,
                           units='')
@@ -98,6 +106,10 @@ class RS_FSL(Instrument):
         self.add_parameter('trace_continuous', type=types.BooleanType,
                           flags=Instrument.FLAG_GETSET,
                           units='')
+        self.add_parameter('trace_mode', type=types.StringType,
+                          flags=Instrument.FLAG_GETSET,
+                          units='')
+        
 
         # Connect to measurement flow to detect start and stop of measurement
         qt.flow.connect('measurement-start', self._measurement_start_cb)
@@ -136,12 +148,30 @@ class RS_FSL(Instrument):
     def get_trace(self):
         '''
         Takes a new, single trace then returns it as a list of amplitudes.
-        For requency/amplitude pairs see spectrum_measure.fsl_measure()
         '''
         logging.debug('Taking trace')
         self._visainstrument.write('INIT;*WAI') #Start new trace and wait for completion
         logging.debug('Reading trace')
         return eval('[' + self._visainstrument.ask('TRAC? TRACE1') + ']') #read out trace
+
+    def grab_trace(self):
+        '''
+        Grabs an already recorded, single trace then returns it as a list of amplitudes.
+        '''
+        logging.debug('Grabbing trace')
+        print 'in fsl driver'
+        trace = self._visainstrument.ask('TRAC? TRACE1')
+        print eval('['+trace+']')
+        return eval('['+trace+']')
+        #return eval('[' + self._visainstrument.ask('TRAC? TRACE1') + ']') #read out trace
+
+    def initiate(self):
+        '''
+        In continuous sweep mode, it restarts the indicated number of measurements.
+        Equal to pressing the run button on the front panel.
+        '''
+        logging.debug('Initiate trace')
+        return self._visainstrument.write("INIT")
 
     def store_trace(self):
         '''
@@ -184,6 +214,20 @@ class RS_FSL(Instrument):
         logging.debug('Reading sweep points')
         return int(self._visainstrument.ask('SWE:POIN?'))
 
+    def do_get_number_of_sweeps(self):
+        '''
+        Number of sweeps to be executed
+        '''
+        logging.debug('Reading number of sweeps')
+        return int(self._visainstrument.ask('SWE:COUN?'))
+
+    def do_get_current_sweep_number(self):
+        '''
+        Current number of sweep being executed
+        '''
+        logging.debug('Reading current sweep number')
+        return int(self._visainstrument.ask('SWE:COUN:CURR?'))    
+
     def do_get_averages(self):
         '''
         Number of averages per sweep. 0 is default and 32767 is max.
@@ -212,6 +256,10 @@ class RS_FSL(Instrument):
         logging.debug('Reading Source power')
         return float(self._visainstrument.ask('SOUR:POW?'))
 
+    def do_get_trace_mode(self):
+        logging.debug('Reading trace mode')
+        return self._visainstrument.ask('DISP:TRAC:MODE?')
+
 
     def do_set_start_frequency(self, start): #in MHz
         logging.debug('Setting start freq to %s' % start)
@@ -224,6 +272,10 @@ class RS_FSL(Instrument):
     def do_set_sweeppoints(self,sweeppoints):
         logging.debug('Setting sweep points to %s' % sweeppoints)
         return self._visainstrument.write('SWE:POIN %s' % sweeppoints)
+
+    def do_set_number_of_sweeps(self,value):
+        logging.debug('Setting number of sweeps to %s' % value)
+        return self._visainstrument.write('SWE:COUN %s' % value)
 
     def do_set_averages(self, averages):
         logging.debug('Setting number of averages to %s' % averages)
@@ -257,6 +309,7 @@ class RS_FSL(Instrument):
             'CFIL' -- channel filters
             'RRC' -- RRC
             'PULS' -- EMI (6dB) filters
+            'FFT' -- FFT (fastest, but cannot be used above 30 kHz bandwidth)
         '''
         logging.debug('Setting filter type to %s' % filter_type)
         return self._visainstrument.write('BAND:TYPE %s' % filter_type)
@@ -296,6 +349,19 @@ class RS_FSL(Instrument):
         logging.debug('setting trace_continuous to %s' % state)
         state=bool_to_str(state)
         return self._visainstrument.write('INIT:CONT %s' % state)
+
+    def do_set_trace_mode(self, value):
+        '''
+        Options are:
+            'WRIT' -- overwrite
+            'VIEW' -- write and hold (cannot be queried)
+            'AVER' -- average
+            'MAXH' -- hold maximum
+            'MINH' -- hold minimum
+        '''
+        logging.debug('Setting trace mode to %s' % value)
+        return self._visainstrument.write('DISP:TRAC:MODE %s' % value)
+    
         
     def write(self,string):
         self._visainstrument.write(string)

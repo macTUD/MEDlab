@@ -19,6 +19,7 @@ from time import sleep
 import types
 import logging
 from instrument import Instrument
+import numpy
 
 
 class Optodac(Instrument): #Harold: was: class OPTO(Instrument):
@@ -31,9 +32,8 @@ class Optodac(Instrument): #Harold: was: class OPTO(Instrument):
         self._sleeptime=0.0
         self.add_parameter('dac', type=types.FloatType,
                         flags=Instrument.FLAG_GETSET, channels=(1, self._numdacs),
-                           minval=-5000.00, maxval=5000, units='mV',
-                           format='%.02f', tags=['sweep'],multiplier=float('nan')) #Harold, added multiplier, FLAG_SET --> FLAG_GETSET
-
+                           minval=-10000.00, maxval=10000, units='mV',
+                           format='%.02f', tags=['sweep'],dac_range=float(5000)) #Harold, added multiplier, FLAG_SET --> FLAG_GETSET
         self._open_serial_connection()
 
     def _open_serial_connection(self):
@@ -48,7 +48,7 @@ class Optodac(Instrument): #Harold: was: class OPTO(Instrument):
                             vpp43.VI_ASRL_PAR_ODD)
         vpp43.set_attribute(self._vi, vpp43.VI_ATTR_ASRL_END_IN,
                             vpp43.VI_ASRL_END_NONE)
-
+        
     def _close_serial_connection(self):
         vpp43.close(self._vi)
 
@@ -57,7 +57,8 @@ class Optodac(Instrument): #Harold: was: class OPTO(Instrument):
         sleep(self._sleeptime)
 
     def _dac_voltage_to_message(self, dac, voltage):
-        bytevalue=int(round(voltage*1000/5000*32768+32768))
+        dac_range=self.get_dac_range(dac)
+        bytevalue=int(round(voltage*1000/dac_range*32768+32768))
         dataH=int(bytevalue/256)
         dataL=bytevalue-dataH*256
         bytedac=128
@@ -93,10 +94,10 @@ class Optodac(Instrument): #Harold: was: class OPTO(Instrument):
         a=self.get_parameter_options('dac%s'%channel)
         return a['value']
 
-    def set_dac_multiplier(self,channel, value):    #added by Harold
-        self.set_parameter_options('dac%s'%channel,multiplier=value)
+    def set_dac_range(self,channel, value):    #added by Harold
+        self.set_parameter_options('dac%s'%channel,dac_range=value)
 
-    def get_dac_multiplier(self,channel):     #added by Harold
+    def get_dac_range(self,channel):     #added by Harold
         a=self.get_parameter_options('dac%s'%channel)
-        return a['multiplier']
-        
+        return a['dac_range']
+       

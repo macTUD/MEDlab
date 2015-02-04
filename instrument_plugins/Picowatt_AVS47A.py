@@ -1,10 +1,5 @@
-# Keithley_2700.py driver for Keithley 2700 DMM
-# Pieter de Groot <pieterdegroot@gmail.com>, 2008
-# Martijn Schaafsma <qtlab@mcschaafsma.nl>, 2008
-# Reinier Heeres <reinier@heeres.eu>, 2008
-#
-# Update december 2009:
-# Michiel Jol <jelle@michieljol.nl>
+# Picowatt_AVS47A.py driver for Picowatt AVS-47A resistance bridge
+# Harold Meerwaldt <H.B.Meerwaldt@tudelft.nl>, 2012
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,7 +31,7 @@ class Picowatt_AVS47A(Instrument):
 
     Usage:
     Initialize with
-    <name> = instruments.create('<name>', 'Keithley_2700',
+    <name> = instruments.create('<name>', 'Picowatt_AVS47A',
         address='<GBIP address>',
         reset=<bool>,
         change_display=<bool>,
@@ -45,7 +40,7 @@ class Picowatt_AVS47A(Instrument):
 
     def __init__(self, name, address, reset=False):
         '''
-        Initializes the Keithley_2700, and communicates with the wrapper.
+        Initializes the Picowatt_AVS47A, and communicates with the wrapper.
 
         Input:
             name (string)           : name of the instrument
@@ -91,7 +86,7 @@ class Picowatt_AVS47A(Instrument):
 #           functions
 # --------------------------------------
 
-    def value(self):
+    def get_resistance(self):
         return self._visainstrument.ask('RES?')
         
     def write(self,string):

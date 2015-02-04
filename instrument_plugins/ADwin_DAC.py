@@ -65,7 +65,7 @@ class ADwin_DAC(Instrument):
         Output:
             None
         '''
-
+        print 'flag 1'
         # Initialize wrapper functions
         logging.info('Initializing instrument ADwin Gold')
         Instrument.__init__(self, name, tags=['virtual'])
@@ -74,12 +74,15 @@ class ADwin_DAC(Instrument):
         self._address = address
 
         self.ADwin = ADwin.ADwin(self._address,1)
-
+        print 'flag 2'
         self.ADwin.Boot('C:\ADwin\ADwin9.btl')
         sleep(0.01)
 
         #For now we just implemented a single fixed program that can be loaded
-        self.ADwin.Load_Process('C:\ADwin\dev\ADwin_DAC.T91')
+        self.ADwin.Load_Process('C:\qtlab\instrument_plugins\ADwin_DACinout.T91')
+        #('C:\ADwin\dev\ADwin_DACinout.T91')C:\qtlab\instrument_plugins\ADwin_DACinout.T91
+        #('C:\qtlab\instrument_plugins\ADwin_DACinout.T91')
+                                
                                 
         self.add_parameter('DAC_1',
                             flags=Instrument.FLAG_GETSET,
@@ -97,9 +100,9 @@ class ADwin_DAC(Instrument):
                             flags=Instrument.FLAG_GETSET,
                             units='V', minval=-10.0, maxval=10.0,
                             type=types.FloatType)
-        self.add_parameter('rampspeed',
+        self.add_parameter('rampsteps',
                            flags=Instrument.FLAG_GETSET,
-                           units='V/s', minval=1, maxval=10, type=types.FloatType)
+                           units='V/s', minval=1, maxval=100, type=types.FloatType)
         self.add_parameter('clockcycle',
                            flags=Instrument.FLAG_GETSET,
                            units='MHz', type=types.FloatType)
@@ -131,12 +134,13 @@ class ADwin_DAC(Instrument):
         print 'something'
         return None
 
-    def do_set_rampspeed(self,rampspeed):
-        self.ADwin.Set_Par(12, int(rampspeed))
-        return int(rampspeed)
+    def do_set_rampsteps(self,rampsteps):
+        '''The larger the faster'''
+        self.ADwin.Set_Par(12, int(rampsteps))
+        return int(rampsteps)
         
 
-    def do_get_rampspeed(self):
+    def do_get_rampsteps(self):
         return float(self.ADwin.Get_Par(12))
 
     def do_set_clockcycle(self,clockcycle):
@@ -163,7 +167,7 @@ class ADwin_DAC(Instrument):
 
     def do_get_DAC_2(self):        
         bit32=self.ADwin.Get_Par(2)
-        print bit32
+        #print bit32
         return Volt(bit32)
 
     def set_bitwise_DAC_2(self, voltage):
@@ -188,7 +192,54 @@ class ADwin_DAC(Instrument):
         bit32=self.ADwin.Get_Par(4)
         return Volt(bit32)
 
+   
+    def set_sec_DAC_1(self, voltage):
+        '''
+        secure sweeps (it waits until the dac reaches the given values )
+        set dac and return when finished
+        This prevents artifacts from a unfinished process
+        '''
+        self.do_set_DAC_1(voltage)
+        qt.msleep(0.002)
+        while abs(self.do_get_DAC_1()-voltage)>0.1:
+            #self.do_set_DAC_1(voltage)
+            qt.msleep(0.010)
+    def set_sec_DAC_2(self, voltage):
+        self.do_set_DAC_2(voltage)
+        qt.msleep(0.002)
+        while abs(self.do_get_DAC_2()-voltage)>0.1:
+            #self.do_set_DAC_2(voltage)
+            qt.msleep(0.010)
+        self.do_set_DAC_2(voltage)
+        
+    def set_sec_DAC_3(self, voltage):
+        self.do_set_DAC_3(voltage)
+        qt.msleep(0.002)
+        while abs(self.do_get_DAC_3()-voltage)>0.1:
+            #self.do_set_DAC_3(voltage)
+            qt.msleep(0.010)
+        self.do_set_DAC_3(voltage)
+        
+    def set_sec_DAC_4(self, voltage):
+        self.do_set_DAC_4(voltage)
+        qt.msleep(0.002)
+        while abs(self.do_get_DAC_4()-voltage)>0.1:
+            #self.do_set_DAC_4(voltage)
+            qt.msleep(0.010)
+        self.do_set_DAC_4(voltage)
 
+
+    def get_ADC(self,averages = 1000):
+        self.ADwin.Set_Par(9,averages) #set averages
+        self.ADwin.Set_Par(13,1) #initiate measurement
+        #qt.msleep(averages*0.0001) no need
+        adc1 = Volt(float(self.ADwin.Get_Par(5)))/float(4)
+        adc2 = Volt(float(self.ADwin.Get_Par(6)))/float(4)
+        #adc3 = Volt(self.ADwin.Get_Par(7))/float(8)
+        #adc4 = Volt(self.ADwin.Get_Par(8))/float(8)
+        return adc1,adc2 #,adc3,adc4
+
+    
 ##        def do_get_Par(self, par):
 ##            '''
 ##            Get the value of par inside the ADwin Par register
