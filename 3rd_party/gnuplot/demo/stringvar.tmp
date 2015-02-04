@@ -1,0 +1,18 @@
+Exercise string handling functions
+
+foo          = ABCDEF
+strlen(foo)  = 6
+substr(foo,3,4) = CD
+
+haystack     = `date`
+haystack     = 現在の日付: 2012/01/20 新しい日付を入力してください: (年-月-日) 
+needle       = :
+S = strstrt(haystack,needle) = 11
+haystack[S-2:S+2] = 付: 2
+It is now 付: 2
+
+words(haystack)   = 4
+word(haystack,5)  = 
+
+sprintf output of long strings works OK
+

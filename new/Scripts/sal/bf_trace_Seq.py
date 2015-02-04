@@ -1,0 +1,16 @@
+#execfile('bf_trace_mode1.py')
+#qt.msleep(1);
+#execfile('bf_trace_mode2.py')
+#qt.msleep(1);
+#execfile('bf_trace_mode3.py')
+#qt.msleep(1);
+#execfile('bf_trace.py')
+#qt.msleep(1);
+execfile('bf_trace_powerSweep_mode1.py')
+qt.msleep(1);
+execfile('bf_trace_powerSweep_mode2.py')
+qt.msleep(1);
+execfile('bf_trace_powerSweep_mode3.py')
+qt.msleep(1);
+execfile('bf_trace_powerSweep_mode4.py')
+qt.msleep(1);

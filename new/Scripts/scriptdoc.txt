@@ -1,0 +1,14 @@
+These are various scripts which I used in measurement. They are polished to various degrees:
+
+spectrum_measure is really a module for use with the FSL. It is polished and easy to use. Furthermore, the generic "full_measure_2D" function at the start may prove useful for other things
+
+ramp is a simple function used in various other scripts to ramp any parameter over time.
+
+metagen is used in various scripts to generate spyview files as the measurement progresses.
+
+bias_sweep/bias_gate_sweep are for simple DC IV measurements
+
+FM_Vg_sweep allows for FM measuremnets, and FMpowersweep allows for FM meausrements varying power.
+
+Note the use of virtual parameters: I often create an instrument called "vi" using the plugin "virtual composite." vi then gets parameters which are really just scaled versions of real parameters. For instance, vi can have a parameter "vg", which is the actual voltage on the gate, and the script sets this vg (vi.set_vg()) rather than the voltage on a lockin or ivvi or anything else.
+
